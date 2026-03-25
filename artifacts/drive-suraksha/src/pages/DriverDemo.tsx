@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { AlertTriangle, MapPin, Loader2, Sparkles, Activity, Upload, Camera, X, Video } from "lucide-react";
+import { AlertTriangle, MapPin, Loader2, Sparkles, Activity, Upload, Camera, X, Video, ExternalLink } from "lucide-react";
 import { useScoringEngine, HAZARDS } from "@/hooks/use-scoring-engine";
 import { ScoreDial } from "@/components/ui/score-dial";
 import { RiskBadge } from "@/components/ui/risk-badge";
@@ -32,10 +32,15 @@ export default function DriverDemo() {
     stopWebcam();
   }, [videoUrl]);
 
+  const isInIframe = window.self !== window.top;
+
   const startWebcam = useCallback(async () => {
     setIsWebcamLoading(true);
     setWebcamError(null);
     try {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        throw new Error("no-api");
+      }
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
         audio: false,
@@ -47,9 +52,15 @@ export default function DriverDemo() {
       }
       setFeedMode("webcam");
     } catch (err: any) {
-      setWebcamError(err?.message?.includes("denied")
-        ? "Camera access denied. Allow camera in browser settings."
-        : "Camera not available on this device/browser.");
+      const name = err?.name ?? "";
+      const msg = err?.message ?? "";
+      if (name === "NotAllowedError" || msg.includes("denied") || msg.includes("Permission")) {
+        setWebcamError("iframe-blocked");
+      } else if (name === "NotFoundError" || msg.includes("no-api")) {
+        setWebcamError("Camera not found on this device.");
+      } else {
+        setWebcamError("Could not access camera. Try opening in a new tab.");
+      }
     } finally {
       setIsWebcamLoading(false);
     }
@@ -156,9 +167,29 @@ export default function DriverDemo() {
                 </div>
               )}
               {webcamError && (
-                <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center gap-3 px-6 text-center">
-                  <Camera className="w-8 h-8 text-destructive" />
-                  <p className="text-sm text-destructive">{webcamError}</p>
+                <div className="absolute inset-0 bg-black/90 flex flex-col items-center justify-center gap-4 px-6 text-center z-40">
+                  <Camera className="w-10 h-10 text-destructive" />
+                  {webcamError === "iframe-blocked" ? (
+                    <>
+                      <p className="text-sm text-white font-semibold leading-relaxed">
+                        Camera blocked by browser security.
+                      </p>
+                      <p className="text-xs text-muted-foreground leading-relaxed max-w-[220px]">
+                        The preview pane iframe cannot access your camera. Open the app directly in a new tab to use webcam.
+                      </p>
+                      <a
+                        href={window.location.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                        Open in New Tab
+                      </a>
+                    </>
+                  ) : (
+                    <p className="text-sm text-destructive">{webcamError}</p>
+                  )}
                   <button onClick={resetFeed} className="text-xs text-muted-foreground underline">Back to simulation</button>
                 </div>
               )}
@@ -247,7 +278,10 @@ export default function DriverDemo() {
           {/* Help tip */}
           {feedMode === "image" && (
             <p className="text-xs text-muted-foreground text-center px-2">
-              Upload a dashcam MP4 or use your device camera to inject a real driver POV into the AI demo.
+              {isInIframe
+                ? <>Upload a dashcam MP4, or <a href={window.location.href} target="_blank" rel="noopener noreferrer" className="text-primary underline underline-offset-2">open in a new tab</a> to use your live camera.</>
+                : "Upload a dashcam MP4 or use your device camera to inject a real driver POV into the AI demo."
+              }
             </p>
           )}
         </div>
