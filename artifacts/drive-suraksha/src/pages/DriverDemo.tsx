@@ -1,12 +1,19 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { AlertTriangle, MapPin, Loader2, Sparkles, Activity, Upload, Camera, X, Video, ExternalLink } from "lucide-react";
+import { AlertTriangle, MapPin, Loader2, Sparkles, Activity, Camera, X, Video, ExternalLink, Cpu } from "lucide-react";
 import { useScoringEngine, HAZARDS } from "@/hooks/use-scoring-engine";
+import { useFrameDetection } from "@/hooks/use-frame-detection";
 import { ScoreDial } from "@/components/ui/score-dial";
 import { RiskBadge } from "@/components/ui/risk-badge";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 
 type FeedMode = "image" | "video" | "webcam";
+
+const NON_POTHOLE_BOX_POSITIONS = [
+  { top: "55%", left: "10%",  width: "18%", height: "12%" },
+  { top: "45%", left: "65%",  width: "20%", height: "14%" },
+  { top: "30%", left: "35%",  width: "16%", height: "10%" },
+];
 
 export default function DriverDemo() {
   const { currentScore, riskLevel, activeHazards, toggleHazard, isInferring } = useScoringEngine(85);
@@ -15,16 +22,32 @@ export default function DriverDemo() {
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [webcamError, setWebcamError] = useState<string | null>(null);
   const [isWebcamLoading, setIsWebcamLoading] = useState(false);
+  const [autoDetect, setAutoDetect] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const webcamStreamRef = useRef<MediaStream | null>(null);
+  const potholeActiveRef = useRef(false);
+
+  const isInIframe = window.self !== window.top;
+  const canAutoDetect = feedMode === "video" || feedMode === "webcam";
+
+  const { detection, isAnalyzing } = useFrameDetection(
+    videoRef,
+    autoDetect && canAutoDetect,
+    useCallback((d) => {
+      const shouldBeActive = d.pothole && d.confidence >= 0.5;
+      if (shouldBeActive !== potholeActiveRef.current) {
+        potholeActiveRef.current = shouldBeActive;
+        toggleHazard("pothole_detected");
+      }
+    }, [toggleHazard])
+  );
 
   const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const url = URL.createObjectURL(file);
-    // Cleanup old blob URL
     if (videoUrl) URL.revokeObjectURL(videoUrl);
     setVideoUrl(url);
     setFeedMode("video");
@@ -32,15 +55,11 @@ export default function DriverDemo() {
     stopWebcam();
   }, [videoUrl]);
 
-  const isInIframe = window.self !== window.top;
-
   const startWebcam = useCallback(async () => {
     setIsWebcamLoading(true);
     setWebcamError(null);
     try {
-      if (!navigator.mediaDevices?.getUserMedia) {
-        throw new Error("no-api");
-      }
+      if (!navigator.mediaDevices?.getUserMedia) throw new Error("no-api");
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
         audio: false,
@@ -79,14 +98,16 @@ export default function DriverDemo() {
     setVideoUrl(null);
     setFeedMode("image");
     setWebcamError(null);
+    setAutoDetect(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
   }, [videoUrl, stopWebcam]);
 
-  // Cleanup on unmount
   useEffect(() => () => {
     stopWebcam();
     if (videoUrl) URL.revokeObjectURL(videoUrl);
   }, []);
+
+  const nonPotholeHazards = Array.from(activeHazards).filter(id => id !== "pothole_detected");
 
   return (
     <div className="p-4 md:p-6 lg:p-8 max-w-[1600px] mx-auto h-full flex flex-col">
@@ -114,7 +135,15 @@ export default function DriverDemo() {
               </span>
             </div>
 
-            {/* Reset button when in video/webcam mode */}
+            {/* AI analyzing badge */}
+            {isAnalyzing && (
+              <div className="absolute top-4 right-12 z-20 flex items-center gap-1.5 bg-primary/20 border border-primary/40 backdrop-blur-md px-2.5 py-1.5 rounded-md">
+                <Cpu className="w-3 h-3 text-primary animate-pulse" />
+                <span className="text-[10px] font-bold font-mono text-primary">ANALYZING</span>
+              </div>
+            )}
+
+            {/* Reset button */}
             {feedMode !== "image" && (
               <button
                 onClick={resetFeed}
@@ -126,7 +155,6 @@ export default function DriverDemo() {
             )}
 
             <div className="flex-1 relative overflow-hidden">
-              {/* Static image (default) */}
               {feedMode === "image" && (
                 <img
                   src={`${import.meta.env.BASE_URL}images/dashcam-view.png`}
@@ -135,9 +163,9 @@ export default function DriverDemo() {
                 />
               )}
 
-              {/* Uploaded video */}
               {feedMode === "video" && videoUrl && (
                 <video
+                  ref={videoRef}
                   src={videoUrl}
                   autoPlay
                   loop
@@ -148,7 +176,6 @@ export default function DriverDemo() {
                 />
               )}
 
-              {/* Live webcam */}
               {feedMode === "webcam" && (
                 <video
                   ref={videoRef}
@@ -159,23 +186,21 @@ export default function DriverDemo() {
                 />
               )}
 
-              {/* Webcam loading / error */}
               {isWebcamLoading && (
                 <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center gap-3">
                   <Loader2 className="w-8 h-8 text-primary animate-spin" />
                   <p className="text-sm text-muted-foreground">Requesting camera access…</p>
                 </div>
               )}
+
               {webcamError && (
                 <div className="absolute inset-0 bg-black/90 flex flex-col items-center justify-center gap-4 px-6 text-center z-40">
                   <Camera className="w-10 h-10 text-destructive" />
                   {webcamError === "iframe-blocked" ? (
                     <>
-                      <p className="text-sm text-white font-semibold leading-relaxed">
-                        Camera blocked by browser security.
-                      </p>
+                      <p className="text-sm text-white font-semibold leading-relaxed">Camera blocked by browser security.</p>
                       <p className="text-xs text-muted-foreground leading-relaxed max-w-[220px]">
-                        The preview pane iframe cannot access your camera. Open the app directly in a new tab to use webcam.
+                        The preview pane iframe cannot access your camera. Open the app in a new tab to use webcam.
                       </p>
                       <a
                         href={window.location.href}
@@ -198,16 +223,34 @@ export default function DriverDemo() {
               <div className="absolute inset-0 bg-primary/5 pointer-events-none" />
               <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-primary to-transparent animate-scan shadow-[0_0_15px_rgba(0,184,217,1)]" />
 
-              {/* Bounding Boxes for active hazards */}
+              {/* AI-detected pothole bounding box (real coordinates from API) */}
               <AnimatePresence>
-                {Array.from(activeHazards).map((hazardId, i) => {
+                {autoDetect && detection?.pothole && detection.bbox && (
+                  <motion.div
+                    key="pothole-ai-bbox"
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    className="absolute border-2 border-destructive bg-destructive/10 backdrop-blur-[2px]"
+                    style={{
+                      left: `${detection.bbox.x}%`,
+                      top: `${detection.bbox.y}%`,
+                      width: `${detection.bbox.width}%`,
+                      height: `${detection.bbox.height}%`,
+                    }}
+                  >
+                    <div className="absolute -top-6 left-[-2px] px-2 py-0.5 text-[10px] font-bold uppercase whitespace-nowrap bg-destructive text-white">
+                      POTHOLE {Math.round(detection.confidence * 100)}%
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Manual hazard bounding boxes (non-pothole) */}
+              <AnimatePresence>
+                {nonPotholeHazards.map((hazardId, i) => {
                   const hazard = HAZARDS.find(h => h.id === hazardId);
-                  const positions = [
-                    { top: '60%', left: '30%', width: '40%', height: '30%' },
-                    { top: '40%', left: '10%', width: '20%', height: '40%' },
-                    { top: '50%', left: '60%', width: '30%', height: '20%' },
-                  ];
-                  const pos = positions[i % positions.length];
+                  const pos = NON_POTHOLE_BOX_POSITIONS[i % NON_POTHOLE_BOX_POSITIONS.length];
                   return (
                     <motion.div
                       key={hazardId}
@@ -216,15 +259,15 @@ export default function DriverDemo() {
                       exit={{ opacity: 0, scale: 0.9 }}
                       className={cn(
                         "absolute border-2 bg-black/20 backdrop-blur-[2px]",
-                        hazard?.severity === 'high' ? 'border-destructive' : 'border-warning'
+                        hazard?.severity === "high" ? "border-destructive" : "border-warning"
                       )}
                       style={pos}
                     >
                       <div className={cn(
                         "absolute -top-6 left-[-2px] px-2 py-0.5 text-[10px] font-bold uppercase whitespace-nowrap",
-                        hazard?.severity === 'high' ? 'bg-destructive text-white' : 'bg-warning text-black'
+                        hazard?.severity === "high" ? "bg-destructive text-white" : "bg-warning text-black"
                       )}>
-                        {hazard?.label} {Math.floor(Math.random() * 10 + 85)}%
+                        {hazard?.label}
                       </div>
                     </motion.div>
                   );
@@ -275,6 +318,30 @@ export default function DriverDemo() {
             </button>
           </div>
 
+          {/* AI Auto-Detect toggle (only when video/webcam is active) */}
+          {canAutoDetect && (
+            <button
+              onClick={() => setAutoDetect(v => !v)}
+              className={cn(
+                "w-full flex items-center justify-between px-4 py-3 rounded-xl border text-sm font-semibold transition-all",
+                autoDetect
+                  ? "bg-primary/15 border-primary/50 text-primary shadow-[0_0_20px_rgba(0,184,217,0.15)]"
+                  : "bg-card border-white/10 text-muted-foreground hover:border-primary/30 hover:text-foreground"
+              )}
+            >
+              <span className="flex items-center gap-2">
+                <Cpu className="w-4 h-4" />
+                AI Pothole Auto-Detect
+              </span>
+              <span className={cn(
+                "text-xs px-2 py-0.5 rounded-full font-bold uppercase",
+                autoDetect ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+              )}>
+                {autoDetect ? (isAnalyzing ? "scanning…" : "ON") : "OFF"}
+              </span>
+            </button>
+          )}
+
           {/* Help tip */}
           {feedMode === "image" && (
             <p className="text-xs text-muted-foreground text-center px-2">
@@ -298,16 +365,18 @@ export default function DriverDemo() {
           <div className="flex-1 overflow-y-auto pr-2 space-y-3 custom-scrollbar">
             {HAZARDS.map((hazard) => {
               const isActive = activeHazards.has(hazard.id);
+              const isAIControlled = hazard.id === "pothole_detected" && autoDetect && canAutoDetect;
               return (
                 <button
                   key={hazard.id}
-                  onClick={() => toggleHazard(hazard.id)}
-                  disabled={isInferring}
+                  onClick={() => !isAIControlled && toggleHazard(hazard.id)}
+                  disabled={isInferring || isAIControlled}
                   className={cn(
                     "w-full flex items-center justify-between p-4 rounded-xl border transition-all text-left group",
                     isActive
                       ? "bg-primary/10 border-primary/50 shadow-[0_0_15px_rgba(0,184,217,0.15)]"
-                      : "bg-background/50 border-white/5 hover:border-white/20 hover:bg-white/5"
+                      : "bg-background/50 border-white/5 hover:border-white/20 hover:bg-white/5",
+                    isAIControlled && "opacity-70 cursor-default"
                   )}
                 >
                   <div className="flex items-center space-x-3">
@@ -320,12 +389,12 @@ export default function DriverDemo() {
                     <div>
                       <p className={cn("font-medium transition-colors", isActive ? "text-foreground" : "text-muted-foreground group-hover:text-foreground")}>
                         {hazard.label}
+                        {isAIControlled && <span className="ml-2 text-[10px] text-primary font-bold uppercase tracking-wide">[AI]</span>}
                       </p>
                       <p className="text-xs text-muted-foreground mt-0.5">Impact: {hazard.impact} pts</p>
                     </div>
                   </div>
 
-                  {/* Switch visual */}
                   <div className={cn(
                     "w-12 h-6 rounded-full p-1 transition-colors duration-300 ease-in-out relative",
                     isActive ? "bg-primary" : "bg-muted-foreground/30"
@@ -346,7 +415,7 @@ export default function DriverDemo() {
           <div className="glass-card rounded-3xl p-8 flex flex-col items-center justify-center flex-1 relative overflow-hidden text-center">
             <div className={cn(
               "absolute inset-0 opacity-10 transition-colors duration-1000 blur-3xl",
-              riskLevel === 'HIGH' ? "bg-destructive" : riskLevel === 'MODERATE' ? "bg-warning" : "bg-success"
+              riskLevel === "HIGH" ? "bg-destructive" : riskLevel === "MODERATE" ? "bg-warning" : "bg-success"
             )} />
 
             <RiskBadge level={riskLevel} className="mb-8 relative z-10 scale-110" />
@@ -396,7 +465,7 @@ export default function DriverDemo() {
             {showSummary && (
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
+                animate={{ opacity: 1, height: "auto" }}
                 exit={{ opacity: 0, height: 0 }}
                 className="glass-card p-4 rounded-2xl text-sm leading-relaxed overflow-hidden"
               >
@@ -404,11 +473,11 @@ export default function DriverDemo() {
                   <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
                   <span className="text-xs font-bold text-primary uppercase">AI Analysis</span>
                 </div>
-                {riskLevel === 'HIGH' ?
-                  "Immediate intervention recommended. Multiple high-severity hazards detected reducing civic score severely. Consider re-routing or taking a break." :
-                  riskLevel === 'MODERATE' ?
-                    "Caution advised. Some civic infractions detected. Please adhere to lane discipline and observe local conditions to improve score." :
-                    "Excellent driving record maintained. No current hazards affecting your civic score. Keep up the good work."
+                {riskLevel === "HIGH"
+                  ? "Immediate intervention recommended. Multiple high-severity hazards detected reducing civic score severely. Consider re-routing or taking a break."
+                  : riskLevel === "MODERATE"
+                    ? "Caution advised. Some civic infractions detected. Please adhere to lane discipline and observe local conditions to improve score."
+                    : "Excellent driving record maintained. No current hazards affecting your civic score. Keep up the good work."
                 }
               </motion.div>
             )}
