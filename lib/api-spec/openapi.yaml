@@ -1,15 +1,24 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: DriveSuraksha AI API specification
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: events
+    description: Driving event operations
+  - name: score
+    description: Civic score operations
+  - name: route
+    description: Route risk operations
+  - name: city
+    description: City intelligence operations
+  - name: demo
+    description: Demo scenario operations
 paths:
   /healthz:
     get:
@@ -24,6 +33,104 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /events:
+    get:
+      operationId: getEvents
+      tags: [events]
+      summary: Get driving events
+      responses:
+        "200":
+          description: List of events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DrivingEvent"
+    post:
+      operationId: createEvent
+      tags: [events]
+      summary: Create a driving event
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEventRequest"
+      responses:
+        "201":
+          description: Event created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DrivingEvent"
+
+  /score:
+    get:
+      operationId: getCivicScore
+      tags: [score]
+      summary: Get civic score
+      responses:
+        "200":
+          description: Current civic score
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CivicScore"
+
+  /score/reset:
+    post:
+      operationId: resetScore
+      tags: [score]
+      summary: Reset civic score to default
+      responses:
+        "200":
+          description: Score reset
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CivicScore"
+
+  /route/risks:
+    get:
+      operationId: getRouteRisks
+      tags: [route]
+      summary: Get route risk zones
+      responses:
+        "200":
+          description: Route risk data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RouteRiskResponse"
+
+  /city/insights:
+    get:
+      operationId: getCityInsights
+      tags: [city]
+      summary: Get city intelligence insights
+      responses:
+        "200":
+          description: City insights
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CityInsights"
+
+  /demo/scenario:
+    get:
+      operationId: getDemoScenario
+      tags: [demo]
+      summary: Get demo scenario steps
+      responses:
+        "200":
+          description: Demo scenario
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DemoScenario"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +141,309 @@ components:
       required:
         - status
 
+    DrivingEvent:
+      type: object
+      properties:
+        id:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        type:
+          type: string
+          enum:
+            - pothole_detected
+            - waterlogging_detected
+            - lane_violation
+            - wrong_side_driving
+            - honking_spike
+            - pedestrian_risk
+            - traffic_signal_violation
+            - helmet_missing
+            - accident_hotspot_nearby
+            - smooth_driving_bonus
+        severity:
+          type: string
+          enum: [low, medium, high]
+        location:
+          type: string
+        description:
+          type: string
+        scoreImpact:
+          type: number
+        recommendation:
+          type: string
+      required:
+        - id
+        - timestamp
+        - type
+        - severity
+        - location
+        - description
+        - scoreImpact
+        - recommendation
+
+    CreateEventRequest:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - pothole_detected
+            - waterlogging_detected
+            - lane_violation
+            - wrong_side_driving
+            - honking_spike
+            - pedestrian_risk
+            - traffic_signal_violation
+            - helmet_missing
+            - accident_hotspot_nearby
+            - smooth_driving_bonus
+        severity:
+          type: string
+          enum: [low, medium, high]
+        location:
+          type: string
+        description:
+          type: string
+      required:
+        - type
+        - severity
+        - location
+        - description
+
+    CivicScore:
+      type: object
+      properties:
+        overall:
+          type: number
+        safety:
+          type: number
+        civicCompliance:
+          type: number
+        smoothDriving:
+          type: number
+        noiseDiscipline:
+          type: number
+        riskLevel:
+          type: string
+          enum: [LOW, MODERATE, HIGH]
+        weeklyTrend:
+          type: array
+          items:
+            $ref: "#/components/schemas/ScoreTrendPoint"
+        improvements:
+          type: array
+          items:
+            type: string
+        deductions:
+          type: array
+          items:
+            type: string
+        recommendation:
+          type: string
+      required:
+        - overall
+        - safety
+        - civicCompliance
+        - smoothDriving
+        - noiseDiscipline
+        - riskLevel
+        - weeklyTrend
+        - improvements
+        - deductions
+        - recommendation
+
+    ScoreTrendPoint:
+      type: object
+      properties:
+        day:
+          type: string
+        score:
+          type: number
+      required:
+        - day
+        - score
+
+    RouteRiskResponse:
+      type: object
+      properties:
+        routeName:
+          type: string
+        totalDistance:
+          type: string
+        overallRating:
+          type: string
+          enum: [LOW, MODERATE, HIGH]
+        riskScore:
+          type: number
+        explanation:
+          type: string
+        zones:
+          type: array
+          items:
+            $ref: "#/components/schemas/RiskZone"
+      required:
+        - routeName
+        - totalDistance
+        - overallRating
+        - riskScore
+        - explanation
+        - zones
+
+    RiskZone:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+        severity:
+          type: string
+          enum: [low, medium, high]
+        description:
+          type: string
+        coordinates:
+          type: string
+        distanceFromStart:
+          type: string
+      required:
+        - id
+        - name
+        - type
+        - severity
+        - description
+        - coordinates
+        - distanceFromStart
+
+    CityInsights:
+      type: object
+      properties:
+        potholeDensity:
+          type: number
+        waterloggingAlerts:
+          type: number
+        highRiskIntersections:
+          type: number
+        honkingIndex:
+          type: number
+        avgCivicScore:
+          type: number
+        violationStats:
+          type: array
+          items:
+            $ref: "#/components/schemas/ViolationStat"
+        alertsOverTime:
+          type: array
+          items:
+            $ref: "#/components/schemas/AlertTimeSeries"
+        hotspots:
+          type: array
+          items:
+            $ref: "#/components/schemas/Hotspot"
+        scoreDistribution:
+          type: array
+          items:
+            $ref: "#/components/schemas/ScoreDistributionBucket"
+      required:
+        - potholeDensity
+        - waterloggingAlerts
+        - highRiskIntersections
+        - honkingIndex
+        - avgCivicScore
+        - violationStats
+        - alertsOverTime
+        - hotspots
+        - scoreDistribution
+
+    ViolationStat:
+      type: object
+      properties:
+        category:
+          type: string
+        count:
+          type: number
+        percentage:
+          type: number
+      required:
+        - category
+        - count
+        - percentage
+
+    AlertTimeSeries:
+      type: object
+      properties:
+        hour:
+          type: string
+        alerts:
+          type: number
+      required:
+        - hour
+        - alerts
+
+    Hotspot:
+      type: object
+      properties:
+        location:
+          type: string
+        severity:
+          type: string
+          enum: [low, medium, high]
+        incidents:
+          type: number
+        type:
+          type: string
+      required:
+        - location
+        - severity
+        - incidents
+        - type
+
+    ScoreDistributionBucket:
+      type: object
+      properties:
+        range:
+          type: string
+        count:
+          type: number
+      required:
+        - range
+        - count
+
+    DemoScenario:
+      type: object
+      properties:
+        steps:
+          type: array
+          items:
+            $ref: "#/components/schemas/DemoStep"
+        totalDuration:
+          type: number
+      required:
+        - steps
+        - totalDuration
+
+    DemoStep:
+      type: object
+      properties:
+        stepNumber:
+          type: number
+        title:
+          type: string
+        description:
+          type: string
+        eventType:
+          type: string
+        delayMs:
+          type: number
+        scoreImpact:
+          type: number
+      required:
+        - stepNumber
+        - title
+        - description
+        - eventType
+        - delayMs
+        - scoreImpact

@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "DriveSuraksha AI"
+version = "1.0.0"
+id = "artifacts/drive-suraksha"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 19771
+
+[services.development]
+run = "pnpm --filter @workspace/drive-suraksha run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/drive-suraksha", "run", "build" ]
+publicDir = "artifacts/drive-suraksha/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "19771"
+BASE_PATH = "/"

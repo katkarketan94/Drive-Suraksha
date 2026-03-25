@@ -1,0 +1,231 @@
+Build a polished hackathon MVP called “DriveSuraksha AI” — an AI-powered driver safety and civic intelligence platform for Indian urban roads.
+
+Context:
+This prototype is for a hackathon. The goal is not full production accuracy; the goal is a convincing, demo-ready working product that shows the workflow end-to-end and matches the concept of:
+- pothole / waterlogging detection
+- traffic rule violation detection
+- two-wheeler risk prediction
+- lane discipline monitoring
+- honking / civic behavior scoring
+- accident hotspot prediction
+- real-time risk alerts
+- civic driving score
+- performance insights dashboard
+
+Build for rapid prototyping in 2 days. Prioritize a clean UI, strong storytelling, and a complete demo flow over perfect ML accuracy.
+
+IMPORTANT PRODUCT DIRECTION:
+This should feel like a “smart urban co-driver” for Indian metro traffic realities.
+The prototype should show:
+1) a driver-facing mobile-first experience
+2) a city admin / analytics dashboard
+3) a mock real-time AI inference pipeline
+4) a civic scoring system
+5) a route risk / hotspot view
+6) a demo mode using sample video/image/GPS events
+
+Use mocked or simulated data where needed, but make the app look and behave like a real AI product.
+If possible, include optional hooks for actual APIs, but do not block the build on them.
+
+TECH STACK:
+Use a modern Replit-friendly stack:
+- Frontend: Next.js + React + Tailwind CSS
+- UI components: shadcn/ui or equivalent clean component library
+- Charts: Recharts or similar
+- State: lightweight local state / Zustand if needed
+- Backend: Next.js API routes
+- Data persistence: use local JSON / in-memory store for MVP, optionally Prisma + SQLite if easy
+- Authentication is not required for MVP unless trivial
+- Make it runnable directly in Replit with clear setup steps
+
+APP STRUCTURE:
+Create these screens:
+
+1) Landing / Overview
+- Hero section: “DriveSuraksha AI — AI-Powered Driver Safety & Civic Intelligence for Smart Cities”
+- Short explanation of what the product does
+- CTA buttons: “Start Demo”, “View Dashboard”, “Try Risk Scan”
+- Show 3 feature cards:
+  - Real-time Risk Alerts
+  - Civic Driving Score
+  - Urban Intelligence Dashboard
+
+2) Driver Demo Screen
+This is the main wow demo.
+- Left panel: simulated camera feed / uploaded image / sample road scene
+- Middle panel: live AI detections list
+- Right panel: risk score + alerts + driving recommendations
+- Include toggles for:
+  - pothole detected
+  - waterlogging detected
+  - lane violation
+  - helmet missing
+  - wrong-side driving
+  - honking spike
+  - nearby pedestrian / vehicle risk
+- When a toggle is turned on, update the risk score and show an alert banner instantly
+- Use animated status states like LOW / MODERATE / HIGH risk
+- Include “Generate Safety Summary” button that creates a concise natural-language explanation of the current driving situation
+
+3) Civic Score Dashboard
+- Show a score from 0–100
+- Break score into categories:
+  - safety
+  - civic compliance
+  - smooth driving
+  - noise discipline
+- Show weekly trend
+- Show “what improved / what hurt score”
+- Show a simple gamified recommendation card: “To improve your score, avoid lane violations and honking spikes”
+
+4) Route Risk Map / Hotspot Screen
+- Show a simplified map-like panel (can be a visual mock, not a real map integration)
+- Display a route with 3–5 risk zones
+- Each zone should have a label such as:
+  - pothole cluster
+  - waterlogging stretch
+  - frequent lane violations
+  - accident hotspot
+- Show a “Route risk rating” and short explanation
+- If real mapping APIs are hard, simulate the map using cards and a route timeline rather than actual map tiles
+
+5) City Intelligence Dashboard
+- Show aggregate city insights:
+  - pothole density heatmap summary
+  - waterlogging alerts
+  - high-risk intersections
+  - honking trend
+  - civic score distribution
+- Include charts for:
+  - top violation categories
+  - risk alerts over time
+  - hotspot severity by location
+- This should feel like something a smart city admin could use
+
+6) Prototype / Demo Mode
+- Add a “Run Demo Scenario” button that simulates a 60–90 second workflow:
+  Step 1: driver starts on a route
+  Step 2: pothole is detected
+  Step 3: lane violation risk appears
+  Step 4: honking spike is detected
+  Step 5: civic score changes
+  Step 6: hotspot recommendation appears
+- The demo should automatically advance through these events with smooth transitions
+- Include a visible event log panel with timestamps and AI decisions
+
+CORE FUNCTIONAL LOGIC:
+Implement a simple rules-based scoring engine so the app feels intelligent even without real ML.
+
+Example scoring logic:
+- Start civic score at 85
+- -15 for pothole/waterlogging hazard if repeated
+- -10 for lane violation
+- -8 for wrong-side driving
+- -5 for honking spike
+- -12 for helmet missing in two-wheeler mode
+- +3 for smooth driving / no incidents over time
+- risk level:
+  - LOW if score >= 75
+  - MODERATE if score between 50 and 74
+  - HIGH if score < 50
+
+Create a function that:
+- ingests simulated events
+- updates civic score
+- updates risk level
+- generates a recommended action
+- appends a human-readable event log entry
+
+Make the logic deterministic and easy to explain in the pitch.
+
+DATA MODEL:
+Create a simple event model with fields like:
+- id
+- timestamp
+- type
+- severity
+- location
+- description
+- scoreImpact
+- recommendation
+
+Event types:
+- pothole_detected
+- waterlogging_detected
+- lane_violation
+- wrong_side_driving
+- honking_spike
+- pedestrian_risk
+- traffic_signal_violation
+- helmet_missing
+- accident_hotspot_nearby
+- smooth_driving_bonus
+
+USER EXPERIENCE REQUIREMENTS:
+- Mobile-friendly layout
+- Clean, premium, hackathon-demo aesthetic
+- Use strong visual hierarchy
+- Use cards, chips, badges, and status indicators
+- Make it feel like a real product a city, insurer, fleet operator, or rider could use
+- Add loading states / fake inference animation to make the AI feel alive
+- Add a dark mode if simple, but do not spend too much time on it
+- Ensure the app is easy to demo live in under 3 minutes
+
+OPTIONAL ENHANCEMENTS IF EASY:
+- Upload image/video stub for hazard detection
+- “Analyze this route” text input
+- mock location autocomplete for Indian cities
+- export summary as PDF / shareable report
+- downloadable demo report JSON
+- simple multi-language support for English + Hindi labels in a few key places
+
+CONTENT / COPY GUIDANCE:
+Use concise, pitch-friendly copy such as:
+- “Predict, prevent, and shape safer driving behavior.”
+- “From alerts to civic accountability.”
+- “Urban co-driver for Indian roads.”
+- “Real-time hazard awareness for riders and city operators.”
+
+AVOID:
+- building a huge product with too many unfinished features
+- overcomplicating authentication
+- integrating too many external services
+- relying on real-time computer vision models that may not work in time
+- generic dashboard UI with no product story
+- anything that slows down the demo
+
+DELIVERABLES TO PREPARE IN THE CODEBASE:
+1) A polished working prototype
+2) A README with:
+   - what the product does
+   - how to run it
+   - demo flow
+   - assumptions
+   - limitations
+3) A clear architecture section in the README or a separate markdown file:
+   - frontend
+   - event engine
+   - scoring logic
+   - dashboards
+   - mock data flow
+4) A sample seed dataset for demo events
+5) Simple code organization so I can explain it in the pitch
+
+IMPLEMENTATION DETAILS:
+- Create reusable components for:
+  - StatCard
+  - AlertBanner
+  - ScoreDial or score bar
+  - EventTimeline
+  - DetectionToggle
+  - RouteRiskCard
+  - HeatmapSummaryCard
+- Add sample data for at least 5 Indian metro-style events
+- Make the demo scenario obvious and one-click
+- Keep the code readable and modular
+
+FINAL PRODUCT GOAL:
+The app should tell a persuasive story:
+“Most mobility apps navigate. DriveSuraksha predicts hazards, prevents accidents, and shapes civic driving behavior — while also generating city-level intelligence.”
+
+Now generate the full app with a production-quality UI, working state management, and demo-ready interactions.

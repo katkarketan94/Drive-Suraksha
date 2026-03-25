@@ -1,0 +1,22 @@
+packages:
+  "recharts": "Required for City Intelligence and Civic Score charts and visualizations"
+  "framer-motion": "Required for smooth page transitions, scanning animations, and dial effects"
+  "clsx": "Utility for constructing className strings conditionally"
+  "tailwind-merge": "Utility to safely merge Tailwind CSS classes"
+  "date-fns": "For elegant date and time formatting in event logs"
+
+images:
+  - path: "artifacts/drive-suraksha/public/images/hero-bg.png"
+    description: "Abstract dark premium tech background with glowing cyan and deep blue data nodes and subtle grid lines, futuristic smart city network vibe, high contrast"
+    aspect_ratio: "16:9"
+  - path: "artifacts/drive-suraksha/public/images/dashcam-view.png"
+    description: "A wide-angle driver's perspective view of a busy Indian urban road (like Bengaluru or Mumbai) at dusk, slightly blurry to look like dashcam footage, neon lights reflecting"
+    aspect_ratio: "16:9"
+  - path: "artifacts/drive-suraksha/public/images/logo-shield.png"
+    description: "Minimalist geometric futuristic shield icon combined with an artificial intelligence eye or network node, glowing cyan on transparent background"
+    aspect_ratio: "1:1"
+
+notes:
+  - App relies on generated API hooks from @workspace/api-client-react
+  - Local state scoring engine is used for the interactive demo mode to provide instant feedback before API sync
+  - The design system utilizes a dark mode base with cyan (primary) and blue (secondary) accents to fit the AI/Safety tech aesthetic
