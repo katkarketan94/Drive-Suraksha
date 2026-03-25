@@ -1,14 +1,81 @@
-import { useState } from "react";
-import { AlertTriangle, MapPin, Loader2, Sparkles, Activity } from "lucide-react";
-import { useScoringEngine, HAZARDS, HazardType } from "@/hooks/use-scoring-engine";
+import { useState, useRef, useCallback, useEffect } from "react";
+import { AlertTriangle, MapPin, Loader2, Sparkles, Activity, Upload, Camera, X, Video } from "lucide-react";
+import { useScoringEngine, HAZARDS } from "@/hooks/use-scoring-engine";
 import { ScoreDial } from "@/components/ui/score-dial";
 import { RiskBadge } from "@/components/ui/risk-badge";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 
+type FeedMode = "image" | "video" | "webcam";
+
 export default function DriverDemo() {
   const { currentScore, riskLevel, activeHazards, toggleHazard, isInferring } = useScoringEngine(85);
   const [showSummary, setShowSummary] = useState(false);
+  const [feedMode, setFeedMode] = useState<FeedMode>("image");
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [webcamError, setWebcamError] = useState<string | null>(null);
+  const [isWebcamLoading, setIsWebcamLoading] = useState(false);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const webcamStreamRef = useRef<MediaStream | null>(null);
+
+  const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    // Cleanup old blob URL
+    if (videoUrl) URL.revokeObjectURL(videoUrl);
+    setVideoUrl(url);
+    setFeedMode("video");
+    setWebcamError(null);
+    stopWebcam();
+  }, [videoUrl]);
+
+  const startWebcam = useCallback(async () => {
+    setIsWebcamLoading(true);
+    setWebcamError(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false,
+      });
+      webcamStreamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.play();
+      }
+      setFeedMode("webcam");
+    } catch (err: any) {
+      setWebcamError(err?.message?.includes("denied")
+        ? "Camera access denied. Allow camera in browser settings."
+        : "Camera not available on this device/browser.");
+    } finally {
+      setIsWebcamLoading(false);
+    }
+  }, []);
+
+  const stopWebcam = useCallback(() => {
+    if (webcamStreamRef.current) {
+      webcamStreamRef.current.getTracks().forEach(t => t.stop());
+      webcamStreamRef.current = null;
+    }
+  }, []);
+
+  const resetFeed = useCallback(() => {
+    stopWebcam();
+    if (videoUrl) URL.revokeObjectURL(videoUrl);
+    setVideoUrl(null);
+    setFeedMode("image");
+    setWebcamError(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }, [videoUrl, stopWebcam]);
+
+  // Cleanup on unmount
+  useEffect(() => () => {
+    stopWebcam();
+    if (videoUrl) URL.revokeObjectURL(videoUrl);
+  }, []);
 
   return (
     <div className="p-4 md:p-6 lg:p-8 max-w-[1600px] mx-auto h-full flex flex-col">
@@ -24,65 +91,165 @@ export default function DriverDemo() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 min-h-0">
-        
-        {/* LEFT: Camera Feed Simulation */}
-        <div className="lg:col-span-4 rounded-3xl overflow-hidden border border-white/10 relative shadow-2xl flex flex-col bg-black">
-          <div className="absolute top-4 left-4 z-20 flex items-center space-x-2 bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-md border border-white/10">
-            <div className="w-2 h-2 rounded-full bg-destructive animate-pulse" />
-            <span className="text-xs font-bold font-mono text-white">REC • 1080p 60fps</span>
-          </div>
-          
-          <div className="flex-1 relative overflow-hidden">
-            <img 
-              src={`${import.meta.env.BASE_URL}images/dashcam-view.png`} 
-              alt="Dashcam Feed" 
-              className="w-full h-full object-cover opacity-80"
-            />
-            {/* AI Scanning Overlay */}
-            <div className="absolute inset-0 bg-primary/5 pointer-events-none" />
-            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-primary to-transparent animate-scan shadow-[0_0_15px_rgba(0,184,217,1)]" />
-            
-            {/* Bounding Boxes for active hazards */}
-            <AnimatePresence>
-              {Array.from(activeHazards).map((hazardId, i) => {
-                const hazard = HAZARDS.find(h => h.id === hazardId);
-                // Fake random positions for bounding boxes based on index
-                const positions = [
-                  { top: '60%', left: '30%', width: '40%', height: '30%' },
-                  { top: '40%', left: '10%', width: '20%', height: '40%' },
-                  { top: '50%', left: '60%', width: '30%', height: '20%' },
-                ];
-                const pos = positions[i % positions.length];
-                
-                return (
-                  <motion.div
-                    key={hazardId}
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.9 }}
-                    className={cn(
-                      "absolute border-2 bg-black/20 backdrop-blur-[2px]",
-                      hazard?.severity === 'high' ? 'border-destructive' : 'border-warning'
-                    )}
-                    style={pos}
-                  >
-                    <div className={cn(
-                      "absolute -top-6 left-[-2px] px-2 py-0.5 text-[10px] font-bold uppercase whitespace-nowrap",
-                      hazard?.severity === 'high' ? 'bg-destructive text-white' : 'bg-warning text-black'
-                    )}>
-                      {hazard?.label} {Math.floor(Math.random() * 10 + 85)}%
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </AnimatePresence>
 
-            {isInferring && (
-              <div className="absolute inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-30">
-                <Loader2 className="w-8 h-8 text-primary animate-spin" />
-              </div>
+        {/* LEFT: Camera Feed */}
+        <div className="lg:col-span-4 flex flex-col gap-3">
+          <div className="rounded-3xl overflow-hidden border border-white/10 relative shadow-2xl flex flex-col bg-black flex-1 min-h-[300px]">
+            {/* Recording badge */}
+            <div className="absolute top-4 left-4 z-20 flex items-center space-x-2 bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-md border border-white/10">
+              <div className={cn("w-2 h-2 rounded-full animate-pulse", feedMode === "image" ? "bg-muted-foreground" : "bg-destructive")} />
+              <span className="text-xs font-bold font-mono text-white">
+                {feedMode === "webcam" ? "LIVE • WEBCAM" : feedMode === "video" ? "VIDEO • POV" : "SIM • 1080p"}
+              </span>
+            </div>
+
+            {/* Reset button when in video/webcam mode */}
+            {feedMode !== "image" && (
+              <button
+                onClick={resetFeed}
+                className="absolute top-4 right-4 z-20 p-1.5 rounded-md bg-black/50 border border-white/10 text-white hover:bg-black/70 transition-colors"
+                title="Reset to simulated feed"
+              >
+                <X className="w-4 h-4" />
+              </button>
             )}
+
+            <div className="flex-1 relative overflow-hidden">
+              {/* Static image (default) */}
+              {feedMode === "image" && (
+                <img
+                  src={`${import.meta.env.BASE_URL}images/dashcam-view.png`}
+                  alt="Dashcam Feed"
+                  className="w-full h-full object-cover opacity-80"
+                />
+              )}
+
+              {/* Uploaded video */}
+              {feedMode === "video" && videoUrl && (
+                <video
+                  src={videoUrl}
+                  autoPlay
+                  loop
+                  muted={false}
+                  controls={false}
+                  playsInline
+                  className="w-full h-full object-cover"
+                />
+              )}
+
+              {/* Live webcam */}
+              {feedMode === "webcam" && (
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  muted
+                  playsInline
+                  className="w-full h-full object-cover"
+                />
+              )}
+
+              {/* Webcam loading / error */}
+              {isWebcamLoading && (
+                <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center gap-3">
+                  <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                  <p className="text-sm text-muted-foreground">Requesting camera access…</p>
+                </div>
+              )}
+              {webcamError && (
+                <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center gap-3 px-6 text-center">
+                  <Camera className="w-8 h-8 text-destructive" />
+                  <p className="text-sm text-destructive">{webcamError}</p>
+                  <button onClick={resetFeed} className="text-xs text-muted-foreground underline">Back to simulation</button>
+                </div>
+              )}
+
+              {/* AI Scanning Overlay */}
+              <div className="absolute inset-0 bg-primary/5 pointer-events-none" />
+              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-primary to-transparent animate-scan shadow-[0_0_15px_rgba(0,184,217,1)]" />
+
+              {/* Bounding Boxes for active hazards */}
+              <AnimatePresence>
+                {Array.from(activeHazards).map((hazardId, i) => {
+                  const hazard = HAZARDS.find(h => h.id === hazardId);
+                  const positions = [
+                    { top: '60%', left: '30%', width: '40%', height: '30%' },
+                    { top: '40%', left: '10%', width: '20%', height: '40%' },
+                    { top: '50%', left: '60%', width: '30%', height: '20%' },
+                  ];
+                  const pos = positions[i % positions.length];
+                  return (
+                    <motion.div
+                      key={hazardId}
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.9 }}
+                      className={cn(
+                        "absolute border-2 bg-black/20 backdrop-blur-[2px]",
+                        hazard?.severity === 'high' ? 'border-destructive' : 'border-warning'
+                      )}
+                      style={pos}
+                    >
+                      <div className={cn(
+                        "absolute -top-6 left-[-2px] px-2 py-0.5 text-[10px] font-bold uppercase whitespace-nowrap",
+                        hazard?.severity === 'high' ? 'bg-destructive text-white' : 'bg-warning text-black'
+                      )}>
+                        {hazard?.label} {Math.floor(Math.random() * 10 + 85)}%
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </AnimatePresence>
+
+              {isInferring && (
+                <div className="absolute inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-30">
+                  <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                </div>
+              )}
+            </div>
           </div>
+
+          {/* Feed source controls */}
+          <div className="grid grid-cols-2 gap-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="video/*"
+              className="hidden"
+              onChange={handleFileUpload}
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className={cn(
+                "flex items-center justify-center gap-2 py-3 px-4 rounded-xl border text-sm font-medium transition-all",
+                feedMode === "video"
+                  ? "bg-primary/10 border-primary/50 text-primary"
+                  : "bg-card border-white/10 text-muted-foreground hover:border-white/30 hover:text-foreground"
+              )}
+            >
+              <Video className="w-4 h-4" />
+              Upload POV Video
+            </button>
+            <button
+              onClick={feedMode === "webcam" ? resetFeed : startWebcam}
+              disabled={isWebcamLoading}
+              className={cn(
+                "flex items-center justify-center gap-2 py-3 px-4 rounded-xl border text-sm font-medium transition-all",
+                feedMode === "webcam"
+                  ? "bg-destructive/10 border-destructive/50 text-destructive"
+                  : "bg-card border-white/10 text-muted-foreground hover:border-white/30 hover:text-foreground"
+              )}
+            >
+              {isWebcamLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
+              {feedMode === "webcam" ? "Stop Camera" : "Use Webcam"}
+            </button>
+          </div>
+
+          {/* Help tip */}
+          {feedMode === "image" && (
+            <p className="text-xs text-muted-foreground text-center px-2">
+              Upload a dashcam MP4 or use your device camera to inject a real driver POV into the AI demo.
+            </p>
+          )}
         </div>
 
         {/* MIDDLE: Detection Toggles */}
@@ -93,7 +260,7 @@ export default function DriverDemo() {
               Environment Injector
             </h3>
           </div>
-          
+
           <div className="flex-1 overflow-y-auto pr-2 space-y-3 custom-scrollbar">
             {HAZARDS.map((hazard) => {
               const isActive = activeHazards.has(hazard.id);
@@ -104,8 +271,8 @@ export default function DriverDemo() {
                   disabled={isInferring}
                   className={cn(
                     "w-full flex items-center justify-between p-4 rounded-xl border transition-all text-left group",
-                    isActive 
-                      ? "bg-primary/10 border-primary/50 shadow-[0_0_15px_rgba(0,184,217,0.15)]" 
+                    isActive
+                      ? "bg-primary/10 border-primary/50 shadow-[0_0_15px_rgba(0,184,217,0.15)]"
                       : "bg-background/50 border-white/5 hover:border-white/20 hover:bg-white/5"
                   )}
                 >
@@ -123,7 +290,7 @@ export default function DriverDemo() {
                       <p className="text-xs text-muted-foreground mt-0.5">Impact: {hazard.impact} pts</p>
                     </div>
                   </div>
-                  
+
                   {/* Switch visual */}
                   <div className={cn(
                     "w-12 h-6 rounded-full p-1 transition-colors duration-300 ease-in-out relative",
@@ -143,19 +310,17 @@ export default function DriverDemo() {
         {/* RIGHT: Real-time Score Panel */}
         <div className="lg:col-span-4 flex flex-col gap-6">
           <div className="glass-card rounded-3xl p-8 flex flex-col items-center justify-center flex-1 relative overflow-hidden text-center">
-            {/* Background glow based on risk */}
             <div className={cn(
               "absolute inset-0 opacity-10 transition-colors duration-1000 blur-3xl",
               riskLevel === 'HIGH' ? "bg-destructive" : riskLevel === 'MODERATE' ? "bg-warning" : "bg-success"
             )} />
-            
+
             <RiskBadge level={riskLevel} className="mb-8 relative z-10 scale-110" />
-            
             <ScoreDial score={currentScore} size={240} className="mb-6 relative z-10" />
-            
+
             <AnimatePresence mode="popLayout">
               {activeHazards.size > 0 ? (
-                <motion.div 
+                <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
@@ -168,14 +333,14 @@ export default function DriverDemo() {
                         <span className="flex items-center"><AlertTriangle className="w-4 h-4 mr-2" /> {h?.label}</span>
                         <span>{h?.impact}</span>
                       </div>
-                    )
+                    );
                   })}
                   {activeHazards.size > 2 && (
                     <p className="text-xs text-muted-foreground pt-1">+{activeHazards.size - 2} more hazards</p>
                   )}
                 </motion.div>
               ) : (
-                <motion.p 
+                <motion.p
                   initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                   className="text-success font-medium relative z-10 flex items-center"
                 >
@@ -185,14 +350,14 @@ export default function DriverDemo() {
             </AnimatePresence>
           </div>
 
-          <button 
+          <button
             onClick={() => setShowSummary(!showSummary)}
             className="w-full py-4 rounded-2xl font-bold bg-secondary text-secondary-foreground hover:bg-secondary/90 shadow-lg shadow-secondary/20 transition-all active:scale-95 flex items-center justify-center"
           >
             <Sparkles className="w-5 h-5 mr-2" />
             Generate Safety Summary
           </button>
-          
+
           <AnimatePresence>
             {showSummary && (
               <motion.div
@@ -205,11 +370,11 @@ export default function DriverDemo() {
                   <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
                   <span className="text-xs font-bold text-primary uppercase">AI Analysis</span>
                 </div>
-                {riskLevel === 'HIGH' ? 
+                {riskLevel === 'HIGH' ?
                   "Immediate intervention recommended. Multiple high-severity hazards detected reducing civic score severely. Consider re-routing or taking a break." :
                   riskLevel === 'MODERATE' ?
-                  "Caution advised. Some civic infractions detected. Please adhere to lane discipline and observe local conditions to improve score." :
-                  "Excellent driving record maintained. No current hazards affecting your civic score. Keep up the good work."
+                    "Caution advised. Some civic infractions detected. Please adhere to lane discipline and observe local conditions to improve score." :
+                    "Excellent driving record maintained. No current hazards affecting your civic score. Keep up the good work."
                 }
               </motion.div>
             )}
