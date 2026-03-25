@@ -13,6 +13,7 @@ interface DetectionResult {
   confidence: number;
   bbox: { x: number; y: number; width: number; height: number } | null;
   label: string;
+  rawResponse?: string;
 }
 
 router.post("/detect/frame", async (req, res) => {
@@ -26,7 +27,7 @@ router.post("/detect/frame", async (req, res) => {
   try {
     const response = await openai.chat.completions.create({
       model: "gpt-4o",
-      max_tokens: 150,
+      max_tokens: 200,
       messages: [
         {
           role: "user",
@@ -35,22 +36,31 @@ router.post("/detect/frame", async (req, res) => {
               type: "image_url",
               image_url: {
                 url: frame.startsWith("data:") ? frame : `data:image/jpeg;base64,${frame}`,
-                detail: "low",
+                detail: "high",
               },
             },
             {
               type: "text",
-              text: `You are a dashcam pothole detector analyzing a road surface frame from an Indian city.
+              text: `You are a road hazard detector for a dashcam safety system. Analyze this dashcam frame for potholes or road damage.
 
-Respond ONLY with valid JSON in this exact format (no markdown, no explanation):
-{"pothole":boolean,"confidence":number,"x":number,"y":number,"width":number,"height":number}
+A pothole can appear as:
+- Dark circular/oval depressions in the road surface
+- Craters filled with water (appearing as dark puddles with irregular edges)
+- Snow/ice-covered depressions with irregular shapes
+- Cracked or broken asphalt patches
+- Raised edges or lips around a road depression
 
-Rules:
-- pothole: true only if you see a clear pothole, road crater, large crack, or severe road damage in the road surface
-- confidence: 0.0 to 1.0 (how certain you are)
-- x, y, width, height: bounding box as percentage (0-100) of the image dimensions where the pothole is. Use smaller boxes (width/height 10-25%). If no pothole, set all to 0.
-- Do NOT trigger on normal road texture, shadows, lane markings, wet patches, or speed bumps
-- Be conservative: only detect obvious potholes visible from a moving vehicle`,
+Respond ONLY with valid JSON (no markdown, no explanation):
+{"pothole":boolean,"confidence":number,"x":number,"y":number,"width":number,"height":number,"note":string}
+
+Fields:
+- pothole: true if you see ANY pothole, road crater, or significant road surface damage
+- confidence: 0.0 to 1.0
+- x, y: top-left corner of bounding box as % of image (0-100)
+- width, height: bounding box size as % of image (keep between 8-25%)
+- note: one sentence describing what you see on the road surface
+- If multiple potholes, return the largest/most prominent one
+- If no pothole: set pothole=false, confidence=0, x=0,y=0,width=0,height=0`,
             },
           ],
         },
@@ -58,30 +68,36 @@ Rules:
     });
 
     const text = response.choices[0]?.message?.content?.trim() ?? "";
+    console.log(`[detect] model response: ${text}`);
 
     let parsed: any;
     try {
-      const jsonMatch = text.match(/\{[^}]+\}/);
+      const jsonMatch = text.match(/\{[\s\S]*?\}/);
       parsed = JSON.parse(jsonMatch ? jsonMatch[0] : text);
     } catch {
-      res.json({ pothole: false, confidence: 0, bbox: null, label: "No pothole" } as DetectionResult);
+      console.error(`[detect] JSON parse failed: ${text}`);
+      res.json({ pothole: false, confidence: 0, bbox: null, label: "Parse error", rawResponse: text } as DetectionResult);
       return;
     }
 
     const result: DetectionResult = {
       pothole: Boolean(parsed.pothole),
       confidence: Math.min(1, Math.max(0, Number(parsed.confidence) || 0)),
-      bbox: parsed.pothole && parsed.width > 0
+      bbox: parsed.pothole && Number(parsed.width) > 0
         ? {
-            x: Number(parsed.x) || 0,
-            y: Number(parsed.y) || 0,
-            width: Math.min(30, Number(parsed.width) || 15),
-            height: Math.min(25, Number(parsed.height) || 12),
+            x: Math.max(0, Math.min(85, Number(parsed.x) || 10)),
+            y: Math.max(0, Math.min(80, Number(parsed.y) || 40)),
+            width: Math.min(30, Math.max(8, Number(parsed.width) || 15)),
+            height: Math.min(25, Math.max(6, Number(parsed.height) || 10)),
           }
         : null,
-      label: parsed.pothole ? `Pothole ${Math.round((parsed.confidence ?? 0.85) * 100)}%` : "No pothole",
+      label: parsed.pothole
+        ? `Pothole ${Math.round((Number(parsed.confidence) || 0.8) * 100)}%`
+        : "No pothole",
+      rawResponse: parsed.note ?? text,
     };
 
+    console.log(`[detect] result: pothole=${result.pothole}, conf=${result.confidence}, note=${result.rawResponse}`);
     res.json(result);
   } catch (err: any) {
     console.error("Detection error:", err?.message);

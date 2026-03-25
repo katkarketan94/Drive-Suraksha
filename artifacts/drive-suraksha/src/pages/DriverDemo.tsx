@@ -102,11 +102,11 @@ export default function DriverDemo() {
   const isInIframe = window.self !== window.top;
   const canAutoDetect = feedMode === "video" || feedMode === "webcam";
 
-  const { detection, isAnalyzing } = useFrameDetection(
+  const { detection, isAnalyzing, lastNote } = useFrameDetection(
     videoRef,
     autoDetect && canAutoDetect,
     useCallback((d) => {
-      const shouldBeActive = d.pothole && d.confidence >= 0.5;
+      const shouldBeActive = d.pothole && d.confidence >= 0.4;
       if (shouldBeActive !== potholeActiveRef.current) {
         potholeActiveRef.current = shouldBeActive;
         toggleHazard("pothole_detected");
@@ -473,6 +473,14 @@ export default function DriverDemo() {
                 {autoDetect ? (isAnalyzing ? "scanning…" : "ON") : "OFF"}
               </span>
             </button>
+          )}
+
+          {/* AI perception note — what the model sees */}
+          {autoDetect && lastNote && (
+            <p className="text-[11px] text-muted-foreground/70 px-1 leading-relaxed flex gap-1.5 items-start">
+              <Cpu className="w-3 h-3 mt-0.5 flex-shrink-0 text-primary/60" />
+              <span><span className="text-primary/80 font-semibold">AI sees:</span> {lastNote}</span>
+            </p>
           )}
 
           {/* Guidance Detail Cards — shown when hazard is active */}

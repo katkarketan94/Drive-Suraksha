@@ -5,11 +5,13 @@ export interface FrameDetection {
   confidence: number;
   bbox: { x: number; y: number; width: number; height: number } | null;
   label: string;
+  rawResponse?: string;
 }
 
-const DETECT_INTERVAL_MS = 2000;
-const CAPTURE_WIDTH = 320;
-const CAPTURE_HEIGHT = 180;
+const DETECT_INTERVAL_MS = 2500;
+const CAPTURE_WIDTH = 640;
+const CAPTURE_HEIGHT = 360;
+const CONFIDENCE_THRESHOLD = 0.4;
 
 export function useFrameDetection(
   videoRef: React.RefObject<HTMLVideoElement | null>,
@@ -18,6 +20,7 @@ export function useFrameDetection(
 ) {
   const [detection, setDetection] = useState<FrameDetection | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [lastNote, setLastNote] = useState<string>("");
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const isAnalyzingRef = useRef(false);
   const enabledRef = useRef(enabled);
@@ -26,7 +29,11 @@ export function useFrameDetection(
 
   const captureFrame = useCallback((): string | null => {
     const video = videoRef.current;
-    if (!video || video.readyState < 2) return null;
+    if (!video) return null;
+
+    // Accept any ready state >= 1 (have metadata) for video elements
+    // Some browsers report readyState=1 even while playing from blob URLs
+    if (video.readyState < 1) return null;
 
     if (!canvasRef.current) {
       canvasRef.current = document.createElement("canvas");
@@ -36,14 +43,24 @@ export function useFrameDetection(
     canvas.height = CAPTURE_HEIGHT;
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
-    ctx.drawImage(video, 0, 0, CAPTURE_WIDTH, CAPTURE_HEIGHT);
-    return canvas.toDataURL("image/jpeg", 0.7);
+
+    try {
+      ctx.drawImage(video, 0, 0, CAPTURE_WIDTH, CAPTURE_HEIGHT);
+    } catch {
+      return null;
+    }
+
+    // Use higher JPEG quality for better AI analysis
+    return canvas.toDataURL("image/jpeg", 0.9);
   }, [videoRef]);
 
   const runDetection = useCallback(async () => {
     if (!enabledRef.current || isAnalyzingRef.current) return;
     const frame = captureFrame();
-    if (!frame) return;
+    if (!frame) {
+      console.warn("[frame-detection] captureFrame returned null — video not ready?");
+      return;
+    }
 
     isAnalyzingRef.current = true;
     setIsAnalyzing(true);
@@ -53,11 +70,24 @@ export function useFrameDetection(
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ frame }),
       });
-      if (!res.ok) return;
+      if (!res.ok) {
+        console.error("[frame-detection] API error:", res.status);
+        return;
+      }
       const data: FrameDetection = await res.json();
-      setDetection(data);
-      onDetection?.(data);
-    } catch {
+      console.log(`[frame-detection] pothole=${data.pothole} conf=${data.confidence} note="${data.rawResponse}"`);
+
+      // Apply confidence threshold
+      const effectiveDetection: FrameDetection = {
+        ...data,
+        pothole: data.pothole && data.confidence >= CONFIDENCE_THRESHOLD,
+      };
+
+      setDetection(effectiveDetection);
+      if (data.rawResponse) setLastNote(data.rawResponse);
+      onDetection?.(effectiveDetection);
+    } catch (e) {
+      console.error("[frame-detection] fetch error:", e);
     } finally {
       isAnalyzingRef.current = false;
       setIsAnalyzing(false);
@@ -68,6 +98,7 @@ export function useFrameDetection(
     if (!enabled) {
       setDetection(null);
       setIsAnalyzing(false);
+      setLastNote("");
       isAnalyzingRef.current = false;
       return;
     }
@@ -77,5 +108,5 @@ export function useFrameDetection(
     return () => clearInterval(interval);
   }, [enabled, runDetection]);
 
-  return { detection, isAnalyzing };
+  return { detection, isAnalyzing, lastNote };
 }
