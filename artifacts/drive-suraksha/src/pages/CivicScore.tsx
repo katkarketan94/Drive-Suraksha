@@ -55,7 +55,7 @@ export default function CivicScore() {
           </div>
           <ScoreDial score={currentScore} size={220} />
           <p className="mt-6 text-center text-muted-foreground text-sm max-w-[200px]">
-            You are driving safer than 85% of drivers in Bengaluru today.
+            You are driving safer than 85% of drivers in Mumbai today.
           </p>
         </div>
 

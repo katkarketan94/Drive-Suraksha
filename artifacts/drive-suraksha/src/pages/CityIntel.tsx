@@ -26,8 +26,8 @@ export default function CityIntel() {
           <p className="text-muted-foreground mt-1">Aggregated data for city planners and authorities.</p>
         </div>
         <select className="bg-card border border-white/10 px-4 py-2 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-primary text-foreground">
-          <option>Bengaluru, KA</option>
           <option>Mumbai, MH</option>
+          <option>Pune, MH</option>
           <option>New Delhi, DL</option>
         </select>
       </div>

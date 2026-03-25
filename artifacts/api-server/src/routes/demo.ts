@@ -8,7 +8,7 @@ router.get("/demo/scenario", (_req, res) => {
       {
         stepNumber: 1,
         title: "Route Started",
-        description: "Driver begins journey from Koramangala to Indiranagar. All systems nominal. AI monitoring active.",
+        description: "Driver begins journey from Bandra to Andheri East. All systems nominal. AI monitoring active.",
         eventType: "smooth_driving_bonus",
         delayMs: 0,
         scoreImpact: 0,
@@ -16,7 +16,7 @@ router.get("/demo/scenario", (_req, res) => {
       {
         stepNumber: 2,
         title: "Pothole Detected",
-        description: "AI camera detects a 40cm pothole cluster on Silk Board Junction approach. Hazard alert issued.",
+        description: "AI camera detects a 40cm pothole cluster on Sion Circle approach. Hazard alert issued.",
         eventType: "pothole_detected",
         delayMs: 8000,
         scoreImpact: -15,
@@ -24,7 +24,7 @@ router.get("/demo/scenario", (_req, res) => {
       {
         stepNumber: 3,
         title: "Lane Violation Risk",
-        description: "Vehicle trajectory analysis shows deviation from lane markers on MG Road stretch. Warning issued.",
+        description: "Vehicle trajectory analysis shows deviation from lane markers on SV Road stretch. Warning issued.",
         eventType: "lane_violation",
         delayMs: 18000,
         scoreImpact: -10,
@@ -32,7 +32,7 @@ router.get("/demo/scenario", (_req, res) => {
       {
         stepNumber: 4,
         title: "Honking Spike Detected",
-        description: "Acoustic sensor records 6 honking incidents in 30 seconds. Civic behavior score penalty applied.",
+        description: "Acoustic sensor records 6 honking incidents in 30 seconds near Dadar TT Circle. Civic behavior score penalty applied.",
         eventType: "honking_spike",
         delayMs: 28000,
         scoreImpact: -5,
@@ -48,7 +48,7 @@ router.get("/demo/scenario", (_req, res) => {
       {
         stepNumber: 6,
         title: "Hotspot Alert & Recommendation",
-        description: "Approaching Brigade Junction — ranked #2 accident blackspot in Bengaluru. Alternate route suggested via Richmond Road.",
+        description: "Approaching Kurla Junction — ranked #2 accident blackspot in Mumbai. Alternate route suggested via Eastern Express Highway.",
         eventType: "accident_hotspot_nearby",
         delayMs: 58000,
         scoreImpact: 0,

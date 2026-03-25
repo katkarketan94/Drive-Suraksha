@@ -45,12 +45,12 @@ let score: CivicScoreState = {
   weeklyTrend: generateWeeklyTrend(),
   improvements: [
     "No sudden braking incidents in last 3 trips",
-    "Consistent lane discipline on highway stretches",
+    "Consistent lane discipline on Western Express Highway",
     "Signal compliance improved by 15%",
   ],
   deductions: [
-    "Honking detected 3 times today",
-    "Minor lane deviation near MG Road",
+    "Honking detected 3 times today near Sion",
+    "Minor lane deviation near SV Road, Bandra",
   ],
   recommendation:
     "To improve your score further, reduce honking and maintain lane discipline on inner city roads.",
@@ -71,12 +71,12 @@ router.post("/score/reset", (_req, res) => {
     weeklyTrend: generateWeeklyTrend(),
     improvements: [
       "No sudden braking incidents in last 3 trips",
-      "Consistent lane discipline on highway stretches",
+      "Consistent lane discipline on Western Express Highway",
       "Signal compliance improved by 15%",
     ],
     deductions: [
-      "Honking detected 3 times today",
-      "Minor lane deviation near MG Road",
+      "Honking detected 3 times today near Sion",
+      "Minor lane deviation near SV Road, Bandra",
     ],
     recommendation:
       "To improve your score further, reduce honking and maintain lane discipline on inner city roads.",

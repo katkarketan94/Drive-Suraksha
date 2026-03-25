@@ -86,7 +86,7 @@ export default function DriverDemo() {
         </div>
         <div className="flex items-center space-x-2 bg-card border border-white/10 px-4 py-2 rounded-lg">
           <MapPin className="w-4 h-4 text-primary" />
-          <span className="text-sm font-medium">Silk Board Junction, BLR</span>
+          <span className="text-sm font-medium">Sion Circle, MUM</span>
         </div>
       </div>
 
