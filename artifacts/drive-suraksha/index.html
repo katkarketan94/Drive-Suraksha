@@ -11,6 +11,13 @@
   </head>
   <body>
     <div id="root"></div>
+    <!-- OpenCV.js WASM — loaded async, sets window.cvReady when ready -->
+    <script>
+      window.Module = {
+        onRuntimeInitialized: function() { window.cvReady = true; }
+      };
+    </script>
+    <script async src="https://docs.opencv.org/4.8.0/opencv.js" type="text/javascript"></script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

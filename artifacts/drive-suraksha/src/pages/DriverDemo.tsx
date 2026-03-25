@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { AlertTriangle, MapPin, Loader2, Sparkles, Activity, Camera, X, Video, ExternalLink, Cpu, Waves, Navigation } from "lucide-react";
 import { useScoringEngine, HAZARDS } from "@/hooks/use-scoring-engine";
-import { useFrameDetection } from "@/hooks/use-frame-detection";
+import { useOpencvDetection } from "@/hooks/use-opencv-detection";
 import { ScoreDial } from "@/components/ui/score-dial";
 import { RiskBadge } from "@/components/ui/risk-badge";
 import { cn } from "@/lib/utils";
@@ -102,7 +102,7 @@ export default function DriverDemo() {
   const isInIframe = window.self !== window.top;
   const canAutoDetect = feedMode === "video" || feedMode === "webcam";
 
-  const { detection, isAnalyzing, lastNote } = useFrameDetection(
+  const { detection, isAnalyzing, cvReady, lastNote } = useOpencvDetection(
     videoRef,
     autoDetect && canAutoDetect,
     useCallback((d) => {
@@ -356,20 +356,20 @@ export default function DriverDemo() {
               <div className="absolute inset-0 bg-primary/5 pointer-events-none" />
               <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-primary to-transparent animate-scan shadow-[0_0_15px_rgba(0,184,217,1)]" />
 
-              {/* AI-detected pothole bounding box (real coordinates from API) */}
+              {/* CV-detected pothole bounding box (real coordinates from OpenCV) */}
               <AnimatePresence>
-                {autoDetect && detection?.pothole && detection.bbox && (
+                {autoDetect && detection?.pothole && detection.box && (
                   <motion.div
-                    key="pothole-ai-bbox"
+                    key="pothole-cv-bbox"
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.9 }}
                     className="absolute border-2 border-destructive bg-destructive/10 backdrop-blur-[2px]"
                     style={{
-                      left: `${detection.bbox.x}%`,
-                      top: `${detection.bbox.y}%`,
-                      width: `${detection.bbox.width}%`,
-                      height: `${detection.bbox.height}%`,
+                      left: `${detection.box.x * 100}%`,
+                      top: `${detection.box.y * 100}%`,
+                      width: `${detection.box.width * 100}%`,
+                      height: `${detection.box.height * 100}%`,
                     }}
                   >
                     <div className="absolute -top-6 left-[-2px] px-2 py-0.5 text-[10px] font-bold uppercase whitespace-nowrap bg-destructive text-white">
@@ -451,35 +451,50 @@ export default function DriverDemo() {
             </button>
           </div>
 
-          {/* AI Auto-Detect toggle (only when video/webcam is active) */}
+          {/* CV Auto-Detect toggle (only when video/webcam is active) */}
           {canAutoDetect && (
             <button
               onClick={() => setAutoDetect(v => !v)}
+              disabled={!cvReady && !autoDetect}
               className={cn(
                 "w-full flex items-center justify-between px-4 py-3 rounded-xl border text-sm font-semibold transition-all",
                 autoDetect
                   ? "bg-primary/15 border-primary/50 text-primary shadow-[0_0_20px_rgba(0,184,217,0.15)]"
-                  : "bg-card border-white/10 text-muted-foreground hover:border-primary/30 hover:text-foreground"
+                  : cvReady
+                    ? "bg-card border-white/10 text-muted-foreground hover:border-primary/30 hover:text-foreground"
+                    : "bg-card border-white/5 text-muted-foreground/50 cursor-not-allowed"
               )}
             >
               <span className="flex items-center gap-2">
-                <Cpu className="w-4 h-4" />
-                AI Pothole Auto-Detect
+                {(!cvReady && !autoDetect) ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Cpu className="w-4 h-4" />
+                )}
+                CV Pothole Detector
               </span>
               <span className={cn(
                 "text-xs px-2 py-0.5 rounded-full font-bold uppercase",
-                autoDetect ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+                autoDetect
+                  ? "bg-primary text-primary-foreground"
+                  : cvReady
+                    ? "bg-muted text-muted-foreground"
+                    : "bg-muted/40 text-muted-foreground/50"
               )}>
-                {autoDetect ? (isAnalyzing ? "scanning…" : "ON") : "OFF"}
+                {!cvReady && !autoDetect
+                  ? "loading cv…"
+                  : autoDetect
+                    ? (isAnalyzing ? "scanning…" : "ON")
+                    : "OFF"}
               </span>
             </button>
           )}
 
-          {/* AI perception note — what the model sees */}
+          {/* CV perception note — what OpenCV sees */}
           {autoDetect && lastNote && (
             <p className="text-[11px] text-muted-foreground/70 px-1 leading-relaxed flex gap-1.5 items-start">
               <Cpu className="w-3 h-3 mt-0.5 flex-shrink-0 text-primary/60" />
-              <span><span className="text-primary/80 font-semibold">AI sees:</span> {lastNote}</span>
+              <span><span className="text-primary/80 font-semibold">CV:</span> {lastNote}</span>
             </p>
           )}
 
