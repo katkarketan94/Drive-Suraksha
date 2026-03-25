@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { AlertTriangle, MapPin, Loader2, Sparkles, Activity, Camera, X, Video, ExternalLink, Cpu } from "lucide-react";
+import { AlertTriangle, MapPin, Loader2, Sparkles, Activity, Camera, X, Video, ExternalLink, Cpu, Waves, Navigation } from "lucide-react";
 import { useScoringEngine, HAZARDS } from "@/hooks/use-scoring-engine";
 import { useFrameDetection } from "@/hooks/use-frame-detection";
 import { ScoreDial } from "@/components/ui/score-dial";
@@ -15,6 +15,32 @@ const NON_POTHOLE_BOX_POSITIONS = [
   { top: "30%", left: "35%",  width: "16%", height: "10%" },
 ];
 
+const ROAD_GUIDANCE: Record<string, {
+  icon: React.ReactNode;
+  title: string;
+  color: string;
+  borderColor: string;
+  actions: string[];
+  audioAlert: string;
+}> = {
+  pothole_detected: {
+    icon: <AlertTriangle className="w-5 h-5" />,
+    title: "POTHOLE AHEAD",
+    color: "bg-orange-500/20 text-orange-300",
+    borderColor: "border-orange-500/60",
+    actions: ["Reduce speed below 20 km/h", "Steer to avoid damaged area", "Hold steering wheel firmly"],
+    audioAlert: "Pothole detected ahead. Reduce speed.",
+  },
+  waterlogging_detected: {
+    icon: <Waves className="w-5 h-5" />,
+    title: "WATERLOGGING AHEAD",
+    color: "bg-blue-500/20 text-blue-300",
+    borderColor: "border-blue-500/60",
+    actions: ["Reduce speed before entering water", "Check water depth — avoid if above axle", "Switch to lower gear if on two-wheeler"],
+    audioAlert: "Waterlogging detected ahead. Slow down.",
+  },
+};
+
 export default function DriverDemo() {
   const { currentScore, riskLevel, activeHazards, toggleHazard, isInferring } = useScoringEngine(85);
   const [showSummary, setShowSummary] = useState(false);
@@ -24,10 +50,54 @@ export default function DriverDemo() {
   const [isWebcamLoading, setIsWebcamLoading] = useState(false);
   const [autoDetect, setAutoDetect] = useState(false);
 
+  const [proximityMap, setProximityMap] = useState<Record<string, number>>({});
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const webcamStreamRef = useRef<MediaStream | null>(null);
   const potholeActiveRef = useRef(false);
+
+  // Proximity countdown for pothole and waterlogging
+  const GUIDANCE_HAZARDS = ["pothole_detected", "waterlogging_detected"] as const;
+
+  useEffect(() => {
+    GUIDANCE_HAZARDS.forEach((id) => {
+      if (activeHazards.has(id)) {
+        setProximityMap(prev => {
+          if (prev[id] !== undefined) return prev;
+          return { ...prev, [id]: 100 };
+        });
+      } else {
+        setProximityMap(prev => {
+          if (prev[id] === undefined) return prev;
+          const next = { ...prev };
+          delete next[id];
+          return next;
+        });
+      }
+    });
+  }, [activeHazards]);
+
+  useEffect(() => {
+    const active = GUIDANCE_HAZARDS.filter(id => proximityMap[id] !== undefined);
+    if (active.length === 0) return;
+    const interval = setInterval(() => {
+      setProximityMap(prev => {
+        const next = { ...prev };
+        active.forEach(id => {
+          if (next[id] !== undefined) {
+            next[id] = Math.max(0, next[id] - Math.floor(Math.random() * 6 + 5));
+          }
+        });
+        return next;
+      });
+    }, 1200);
+    return () => clearInterval(interval);
+  }, [Object.keys(proximityMap).join(",")]);
+
+  const activeGuidance = GUIDANCE_HAZARDS.filter(id => proximityMap[id] !== undefined)
+    .map(id => ({ id, dist: proximityMap[id]!, guide: ROAD_GUIDANCE[id] }))
+    .sort((a, b) => a.dist - b.dist);
 
   const isInIframe = window.self !== window.top;
   const canAutoDetect = feedMode === "video" || feedMode === "webcam";
@@ -219,6 +289,69 @@ export default function DriverDemo() {
                 </div>
               )}
 
+              {/* Driver Guidance HUD — bottom of feed (shows most urgent hazard only) */}
+              <AnimatePresence>
+                {activeGuidance.slice(0, 1).map(({ id, dist, guide }) => {
+                  const urgency = dist <= 20 ? "high" : dist <= 50 ? "med" : "low";
+                  return (
+                    <motion.div
+                      key={id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 20 }}
+                      transition={{ duration: 0.3 }}
+                      className={cn(
+                        "absolute bottom-3 left-3 right-3 z-30 flex items-center gap-3 px-3 py-2.5 rounded-xl border backdrop-blur-md",
+                        urgency === "high"
+                          ? "bg-red-950/80 border-red-500/70 shadow-[0_0_20px_rgba(239,68,68,0.4)]"
+                          : urgency === "med"
+                            ? "bg-orange-950/80 border-orange-500/60 shadow-[0_0_15px_rgba(249,115,22,0.3)]"
+                            : "bg-black/70 border-white/20"
+                      )}
+                    >
+                      <div className={cn(
+                        "flex-shrink-0 w-9 h-9 rounded-lg flex items-center justify-center font-bold",
+                        urgency === "high" ? "bg-red-500 text-white" :
+                          urgency === "med" ? "bg-orange-500 text-white" : "bg-white/10 text-orange-300"
+                      )}>
+                        {guide.icon}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline gap-2">
+                          <span className={cn(
+                            "text-xs font-extrabold tracking-wider uppercase",
+                            urgency === "high" ? "text-red-300" :
+                              urgency === "med" ? "text-orange-300" : "text-orange-200"
+                          )}>
+                            {guide.title}
+                          </span>
+                          {urgency === "high" && (
+                            <span className="text-[10px] font-bold bg-red-500 text-white px-1.5 rounded animate-pulse">BRAKE NOW</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <Navigation className="w-3 h-3 text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground font-mono">
+                            {dist === 0 ? "AT LOCATION — GO SLOW" : `${dist}m ahead`}
+                          </span>
+                          {/* distance bar */}
+                          <div className="flex-1 h-1 rounded-full bg-white/10 overflow-hidden">
+                            <div
+                              className={cn(
+                                "h-full rounded-full transition-all duration-700",
+                                urgency === "high" ? "bg-red-500" :
+                                  urgency === "med" ? "bg-orange-400" : "bg-orange-300"
+                              )}
+                              style={{ width: `${100 - dist}%` }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </AnimatePresence>
+
               {/* AI Scanning Overlay */}
               <div className="absolute inset-0 bg-primary/5 pointer-events-none" />
               <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-primary to-transparent animate-scan shadow-[0_0_15px_rgba(0,184,217,1)]" />
@@ -342,8 +475,59 @@ export default function DriverDemo() {
             </button>
           )}
 
+          {/* Guidance Detail Cards — shown when hazard is active */}
+          <AnimatePresence>
+            {activeGuidance.map(({ id, dist, guide }) => {
+              const urgency = dist <= 20 ? "high" : dist <= 50 ? "med" : "low";
+              return (
+                <motion.div
+                  key={`card-${id}`}
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.25 }}
+                  className="overflow-hidden"
+                >
+                  <div className={cn(
+                    "rounded-2xl border p-4",
+                    urgency === "high" ? "bg-red-950/40 border-red-500/40" :
+                      urgency === "med" ? "bg-orange-950/40 border-orange-500/40" :
+                        "bg-card border-white/10"
+                  )}>
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className={cn(
+                        "flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider",
+                        urgency === "high" ? "text-red-400" :
+                          urgency === "med" ? "text-orange-400" : "text-orange-300"
+                      )}>
+                        {guide.icon} {guide.title}
+                      </span>
+                      <span className="ml-auto text-xs font-mono text-muted-foreground">
+                        {dist === 0 ? "AT LOCATION" : `${dist}m`}
+                      </span>
+                    </div>
+                    <ul className="space-y-1.5">
+                      {guide.actions.map((action, i) => (
+                        <li key={i} className="flex items-start gap-2 text-xs text-foreground/80">
+                          <span className={cn(
+                            "mt-0.5 w-4 h-4 rounded-full flex-shrink-0 flex items-center justify-center text-[9px] font-bold",
+                            urgency === "high" ? "bg-red-500 text-white" :
+                              urgency === "med" ? "bg-orange-500 text-white" : "bg-primary/20 text-primary"
+                          )}>
+                            {i + 1}
+                          </span>
+                          {action}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
+
           {/* Help tip */}
-          {feedMode === "image" && (
+          {feedMode === "image" && activeGuidance.length === 0 && (
             <p className="text-xs text-muted-foreground text-center px-2">
               {isInIframe
                 ? <>Upload a dashcam MP4, or <a href={window.location.href} target="_blank" rel="noopener noreferrer" className="text-primary underline underline-offset-2">open in a new tab</a> to use your live camera.</>
