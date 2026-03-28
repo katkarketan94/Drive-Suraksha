@@ -11,10 +11,12 @@ const VIOLATION_DATA = [
 ];
 
 const HOTSPOTS = [
-  { id: 1, loc: "Silk Board", incidents: 342, type: "Congestion & Lane Violations", severity: "HIGH" },
-  { id: 2, loc: "Koramangala 80ft", incidents: 156, type: "Pothole Clusters", severity: "MODERATE" },
-  { id: 3, loc: "Outer Ring Road", incidents: 890, type: "Waterlogging", severity: "HIGH" },
-  { id: 4, loc: "Indiranagar 100ft", incidents: 124, type: "Wrong Side Driving", severity: "MODERATE" },
+  { id: 1, loc: "Sion Circle", incidents: 312, type: "Multi-hazard Cluster", severity: "HIGH" },
+  { id: 2, loc: "Kurla Junction", incidents: 247, type: "Accident Hotspot", severity: "HIGH" },
+  { id: 3, loc: "Dadar TT Circle", incidents: 198, type: "Waterlogging + Potholes", severity: "HIGH" },
+  { id: 4, loc: "Bandra West (SV Rd)", incidents: 145, type: "Wrong Side Driving", severity: "MODERATE" },
+  { id: 5, loc: "Ghatkopar Bridge", incidents: 134, type: "Pothole Cluster", severity: "MODERATE" },
+  { id: 6, loc: "Powai IT Corridor", incidents: 112, type: "Lane Violations", severity: "MODERATE" },
 ];
 
 export default function CityIntel() {
